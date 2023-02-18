@@ -1,8 +1,9 @@
-#include <iostream>
+#include <redis.h>
 
-#include <sys/socket.h>
+#include <iostream>
 #include <netinet/in.h>
-#include <unistd.h>
+#include <cstring>
+
 
 static void process_connection(int connection_file_descriptor) {
     char read_buffer[64] = {};
@@ -19,6 +20,52 @@ static void process_connection(int connection_file_descriptor) {
     char write_buffer[] = "Hello, Client!";
 
     write(connection_file_descriptor, write_buffer, sizeof(write_buffer));
+}
+
+static int32_t handle_single_request(int connection_file_descriptor) {
+    char read_buffer[4 + k_max_msg];
+
+    errno = 0;
+
+    // Read the message length (first 4 bytes little endian)
+    int32_t err = read_full(connection_file_descriptor, read_buffer, 4);
+
+    if (err) {
+        if (errno == 0) {
+            std::cout << "EOF" << std::endl;
+        } else {
+            std::cout << "Error reading message length" << std::endl;
+        }
+
+        return err;
+    }
+
+    uint32_t message_length = 0;
+    memcpy(&message_length, read_buffer, 4);
+
+    if (message_length > k_max_msg) {
+        std::cout << "Message too long" << std::endl;
+        return -1;
+    }
+
+    // Read the message using the length from the first 4 bytes
+    err = read_full(connection_file_descriptor, &read_buffer[4], message_length);
+    if (err) {
+        std::cout << "Error reading message" << std::endl;
+        return err;
+    }
+
+    read_buffer[4 + message_length] = '\0'; // Null terminate the string
+    printf("Received: %s\n", &read_buffer[4]);
+
+    // Write the message back to the client
+    const char reply[] = "Hello, Client!";
+    char write_buffer[4 + sizeof(reply)];
+    message_length = (uint32_t)sizeof(reply);
+
+    memcpy(write_buffer, &message_length, 4);
+    memcpy(&write_buffer[4], reply, message_length);
+    return write_all(connection_file_descriptor, write_buffer, 4 + message_length);
 }
 
 int main()
@@ -96,7 +143,13 @@ int main()
             continue;
         }
 
-        process_connection(conn_file_descriptor);
+        // Serve one connection at a time
+        while (true) {
+            int32_t err = handle_single_request(conn_file_descriptor);
+            if(err) {
+                break;
+            }
+        }
 
         // close the connection
         close(conn_file_descriptor);

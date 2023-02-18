@@ -2,4 +2,6 @@ project(server)
 
 set(CMAKE_CXX_STANDARD 23)
 
+include_directories(../shared)
+
 add_executable(server main.cpp)
