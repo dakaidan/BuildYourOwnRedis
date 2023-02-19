@@ -18,13 +18,27 @@ const char* logLevelToString(LogLevel level)
 {
     switch (level)
     {
-        default: return "Unknown";
-        case LogLevel::Trace: return "Trace";
-        case LogLevel::Debug: return "Debug";
-        case LogLevel::Info: return "Info";
-        case LogLevel::Warning: return "Warning";
-        case LogLevel::Error: return "Error";
-        case LogLevel::Fatal: return "Fatal";
+        default: return "[Unknown]";
+        case LogLevel::Trace: return "[Trace]";
+        case LogLevel::Debug: return "[Debug]";
+        case LogLevel::Info: return "[Info] ";
+        case LogLevel::Warning: return "[Warn] ";
+        case LogLevel::Error: return "[Error]";
+        case LogLevel::Fatal: return "[Fatal]";
+    }
+}
+
+const char* logLevelToColor(LogLevel level)
+{
+    switch (level)
+    {
+        default: return "\033[0m";
+        case LogLevel::Trace: return "\033[37m";
+        case LogLevel::Debug: return "\033[36m";
+        case LogLevel::Info: return "\033[32m";
+        case LogLevel::Warning: return "\033[33m";
+        case LogLevel::Error: return "\033[31m";
+        case LogLevel::Fatal: return "\033[31;1m";
     }
 }
 
@@ -58,11 +72,11 @@ const char* logLevelToString(LogLevel level)
 #endif
 
 #if (LOG_LEVEL <= LOG_LEVEL_WARNING) && defined(LOG_TO_FILE)
-    #define LOG_WARNING(message, ...) Logger::log(LogLevel::Warning, message, ##__VA_ARGS__)
+    #define LOG_WARN(message, ...) Logger::log(LogLevel::Warning, message, ##__VA_ARGS__)
 #elif (LOG_LEVEL <= LOG_LEVEL_WARNING)
-    #define LOG_WARNING(message, ...) Logger::log_to_console(LogLevel::Warning, message, ##__VA_ARGS__)
+    #define LOG_WARN(message, ...) Logger::log_to_console(LogLevel::Warning, message, ##__VA_ARGS__)
 #else
-    #define LOG_WARNING(message, ...)
+    #define LOG_WARN(message, ...)
 #endif
 
 #if (LOG_LEVEL <= LOG_LEVEL_ERROR) && defined(LOG_TO_FILE)
@@ -105,6 +119,10 @@ private:
         return now_tm;
     }
 
+    static void reset_ansi_color() {
+        printf("\033[0m");
+    }
+
 public:
 
     template<typename... Args>
@@ -121,7 +139,7 @@ public:
             #endif
         }
 
-        fprintf(m_file, "[%s] ", logLevelToString(level));
+        fprintf(m_file, "%s ", logLevelToString(level));
         auto now_tm = log_timestamp();
 
         fprintf(m_file, "(%d-%02d-%02d %02d:%02d:%02d):\t",
@@ -137,7 +155,10 @@ public:
     template<typename... Args>
     static void log_to_console(LogLevel level, const char* message, Args... args) {
         std::scoped_lock lock(m_console_mutex);
-        printf("[%s] ", logLevelToString(level));
+
+        auto color = logLevelToColor(level);
+
+        printf("%s%s ", color, logLevelToString(level));
         auto now_tm = log_timestamp();
         printf("(%d-%02d-%02d %02d:%02d:%02d):\t",
                now_tm->tm_year + 1900, now_tm->tm_mon + 1, now_tm->tm_mday,
@@ -145,6 +166,7 @@ public:
         );
         printf(message, args...);
         printf("\n");
+        reset_ansi_color();
     }
 
     template<typename... Args>
