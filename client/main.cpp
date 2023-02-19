@@ -1,6 +1,10 @@
 #include <redis.h>
 
-#include <iostream>
+#define LOG_TO_FILE true
+#define LOG_FILE SOURCE_DIR "/log.txt"  // Log to the source directory in log.txt
+#define LOG_LEVEL 0
+#include <logger.h>
+
 #include <netinet/in.h>
 #include <cstring>
 
@@ -9,13 +13,13 @@ static int32_t query_server(int connection_file_descriptor, char* text) {
     auto text_length = (uint32_t) strlen(text);
 
     if (text_length > k_max_msg) {
-        std::cout << "Message too long" << std::endl;
+        LOG_ERROR("Message too long");
         return -1;
     }
 
-    char write_buffer[4 + k_max_msg];
+    char write_buffer[4 + k_max_msg + 1];
     memcpy(write_buffer, &text_length, 4);
-    memcpy(&write_buffer[4], text, text_length);
+    strcpy(&write_buffer[4], text);
 
     if (int32_t err = write_all(connection_file_descriptor, write_buffer, 4 + text_length)) {
         return err;
@@ -28,40 +32,39 @@ static int32_t query_server(int connection_file_descriptor, char* text) {
 
     if (err) {
         if (errno == 0) {
-            std::cout << "EOF" << std::endl;
+            LOG_DEBUG("EOF");
         } else {
-            std::cout << "Error reading message length" << std::endl;
+            LOG_ERROR("Error reading message length");
         }
-
         return err;
     }
 
     memcpy(&text_length, read_buffer, 4);
     if (text_length > k_max_msg) {
-        std::cout << "Message too long" << std::endl;
+        LOG_ERROR("Message too long");
         return -1;
     }
 
     err = read_full(connection_file_descriptor, &read_buffer[4], text_length);
     if (err) {
-        std::cout << "Error reading message" << std::endl;
+        LOG_ERROR("Error reading message");
         return err;
     }
 
     read_buffer[4 + text_length] = '\0'; // Null terminate the string
-    printf("Received: %s\n", &read_buffer[4]);
+    LOG_TRACE("Received: %s", &read_buffer[4]);
     return 0;
 }
 
 
 int main()
 {
-    std::cout << "Hello, Redis Client!" << std::endl;
+    LOG_INFO("Starting client");
 
     int file_descriptor = socket(AF_INET, SOCK_STREAM, 0);
 
     if(file_descriptor < 0) {
-        std::cout << "Failed to create socket" << std::endl;
+        LOG_FATAL("Failed to create socket");
         return 1;
     }
 
@@ -73,7 +76,7 @@ int main()
     int return_value = connect(file_descriptor, (sockaddr*)&addr, sizeof(addr));
 
     if(return_value) {
-        std::cout << "Failed to connect to server" << std::endl;
+        LOG_FATAL("Failed to connect to server");
         return 1;
     }
 
@@ -81,14 +84,18 @@ int main()
 
     int32_t err = query_server(file_descriptor, text);
     if (err) {
-        goto L_DONE;
+        LOG_ERROR("Error querying server");
+        close(file_descriptor);
+        return 1;
     }
 
     text[strlen(text) - 1] = '?';
 
     err = query_server(file_descriptor, text);
     if (err) {
-        goto L_DONE;
+        LOG_ERROR("Error querying server");
+        close(file_descriptor);
+        return 1;
     }
 
     // change 'Server?' to 'World!!'
@@ -96,10 +103,11 @@ int main()
 
     err = query_server(file_descriptor, text);
     if (err) {
-        goto L_DONE;
+        LOG_ERROR("Error querying server");
+        close(file_descriptor);
+        return 1;
     }
 
-L_DONE:
     close(file_descriptor);
     return 0;
 }

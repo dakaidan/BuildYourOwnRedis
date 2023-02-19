@@ -1,6 +1,11 @@
 #include <redis.h>
 
-#include <iostream>
+#define LOG_TO_FILE true
+#define LOG_FILE SOURCE_DIR "/log.txt"  // Log to the source directory in log.txt
+#define LOG_LEVEL 0
+
+#include <logger.h>
+
 #include <netinet/in.h>
 #include <cstring>
 
@@ -11,11 +16,11 @@ static void process_connection(int connection_file_descriptor) {
     ssize_t number_read = read(connection_file_descriptor, read_buffer, sizeof(read_buffer) - 1);
 
     if(number_read < 0) {
-        std::cout << "Failed to read from connection" << std::endl;
+        LOG_ERROR("Error reading from socket");
         return;
     }
 
-    printf("Received: %s\n", read_buffer);
+    LOG_TRACE("Received: %s", read_buffer);
 
     char write_buffer[] = "Hello, Client!";
 
@@ -32,9 +37,9 @@ static int32_t handle_single_request(int connection_file_descriptor) {
 
     if (err) {
         if (errno == 0) {
-            std::cout << "EOF" << std::endl;
+            LOG_DEBUG("EOF");
         } else {
-            std::cout << "Error reading message length" << std::endl;
+            LOG_ERROR("Error reading message length");
         }
 
         return err;
@@ -44,19 +49,19 @@ static int32_t handle_single_request(int connection_file_descriptor) {
     memcpy(&message_length, read_buffer, 4);
 
     if (message_length > k_max_msg) {
-        std::cout << "Message too long" << std::endl;
+        LOG_ERROR("Message too long");
         return -1;
     }
 
     // Read the message using the length from the first 4 bytes
     err = read_full(connection_file_descriptor, &read_buffer[4], message_length);
     if (err) {
-        std::cout << "Error reading message" << std::endl;
+        LOG_ERROR("Error reading message");
         return err;
     }
 
     read_buffer[4 + message_length] = '\0'; // Null terminate the string
-    printf("Received: %s\n", &read_buffer[4]);
+    LOG_TRACE("Received: %s", &read_buffer[4]);
 
     // Write the message back to the client
     const char reply[] = "Hello, Client!";
@@ -70,7 +75,7 @@ static int32_t handle_single_request(int connection_file_descriptor) {
 
 int main()
 {
-    std::cout << "Hello, Redis Server!" << std::endl;
+    LOG_TRACE("Hello, Redis Server!");
 
     /*
      * Get a file descriptor for a socket.
@@ -111,7 +116,7 @@ int main()
     int ret_val = bind(file_descriptor, (const sockaddr*)&addr, sizeof(addr));
 
     if(ret_val) {
-        std::cout << "Failed to bind to address" << std::endl;
+        LOG_FATAL("Failed to bind socket to address");
         return 1;
     }
 
@@ -123,7 +128,7 @@ int main()
     ret_val = listen(file_descriptor, SOMAXCONN);
 
     if(ret_val) {
-        std::cout << "Failed to listen for connections" << std::endl;
+        LOG_FATAL("Failed to listen for connections");
         return 1;
     }
 
@@ -139,7 +144,7 @@ int main()
         int conn_file_descriptor = accept(file_descriptor, (sockaddr*)&client_addr, &socklen);
 
         if(conn_file_descriptor < 0) {
-            std::cout << "Failed to accept connection" << std::endl;
+            LOG_ERROR("Failed to accept connection");
             continue;
         }
 
