@@ -4,9 +4,9 @@
 #include <sys/socket.h>
 #include <cassert>
 
-static const size_t k_max_msg = 4096;
+const size_t k_max_msg = 4096;
 
-static int32_t read_full(int connection_file_descriptor, char* buffer, size_t buffer_size) {
+int32_t read_full(int connection_file_descriptor, char* buffer, size_t buffer_size) {
     while (buffer_size > 0) {
         ssize_t number_read = read(connection_file_descriptor, buffer, buffer_size);
 
@@ -22,7 +22,7 @@ static int32_t read_full(int connection_file_descriptor, char* buffer, size_t bu
     return 0;
 }
 
-static int32_t write_all(int connection_file_descriptor, char* buffer, size_t buffer_size) {
+int32_t write_all(int connection_file_descriptor, char* buffer, size_t buffer_size) {
     while (buffer_size > 0) {
         ssize_t number_written = write(connection_file_descriptor, buffer, buffer_size);
 
