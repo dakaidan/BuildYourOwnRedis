@@ -198,3 +198,6 @@ _deps
 # End of https://www.toptal.com/developers/gitignore/api/linux
 
 .idea/
+
+# ignores all log.txt files
+**/log.txt
