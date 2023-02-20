@@ -28,12 +28,11 @@ static void process_connection(int connection_file_descriptor) {
 }
 
 static int32_t handle_single_request(int connection_file_descriptor) {
-    char read_buffer[4 + k_max_msg];
+    char read_buffer[4 + k_max_msg + 1];
 
     errno = 0;
-
-    // Read the message length (first 4 bytes little endian)
-    int32_t err = read_full(connection_file_descriptor, read_buffer, 4);
+    uint32_t message_length = 0;
+    int32_t err = parse_buffered_read(connection_file_descriptor, read_buffer, 4 + k_max_msg, &message_length);
 
     if (err) {
         if (errno == 0) {
@@ -45,19 +44,9 @@ static int32_t handle_single_request(int connection_file_descriptor) {
         return err;
     }
 
-    uint32_t message_length = 0;
-    memcpy(&message_length, read_buffer, 4);
-
     if (message_length > k_max_msg) {
         LOG_ERROR("Message too long");
         return -1;
-    }
-
-    // Read the message using the length from the first 4 bytes
-    err = read_full(connection_file_descriptor, &read_buffer[4], message_length);
-    if (err) {
-        LOG_ERROR("Error reading message");
-        return err;
     }
 
     read_buffer[4 + message_length] = '\0'; // Null terminate the string
@@ -75,7 +64,7 @@ static int32_t handle_single_request(int connection_file_descriptor) {
 
 int main()
 {
-    LOG_TRACE("Hello, Redis Server!");
+    LOG_INFO("Hello, Redis Server!");
 
     /*
      * Get a file descriptor for a socket.

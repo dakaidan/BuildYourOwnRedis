@@ -98,7 +98,6 @@ int main()
         return 1;
     }
 
-    // change 'Server?' to 'World!!'
     text[strlen(text) - 1] = '~';
 
     err = query_server(file_descriptor, text);
